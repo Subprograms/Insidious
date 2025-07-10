@@ -1,0 +1,14 @@
+SELECT *
+FROM logs
+WHERE operation IN ('REST.GET.OBJECT','REST.GET.BUCKET')
+  AND remote_ip NOT LIKE '10.%'
+  AND remote_ip NOT LIKE '192.168.%'
+  AND remote_ip NOT LIKE '127.%'
+  AND remote_ip NOT LIKE '172.31.%'
+  AND object_key IS NOT NULL
+  AND host      IS NOT NULL
+  AND (
+       LOWER(object_key)   LIKE '%secret%'
+    OR LOWER(object_key)   LIKE '%.txt'
+    OR LOWER(request_uri)  LIKE '%.txt%'
+  );

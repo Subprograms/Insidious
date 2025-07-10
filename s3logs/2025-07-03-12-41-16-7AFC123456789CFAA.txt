@@ -1,0 +1,1 @@
+bf38a4eaedd50c309cacfab0c8e7d254cc361f66ae2c36fbaedb22879cfc54ce burgerqueen-dev-secrets [08/Jul/2025:02:55:52 +0000] 192.0.2.10 - EJZ03XAFEY57SSAJ REST.GET.OBJECT "krabby patty secret formula.txt" "GET /krabby%20patty%20secret%20formula.txt HTTP/1.1" 200 - 1337 1337 15 12 "-" "aws-cli/2.15.23 Python/3.11.9 Linux/6.1.0" - - - - burgerqueen-dev-secrets.s3.amazonaws.com - TLSv1.3

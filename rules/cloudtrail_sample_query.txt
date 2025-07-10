@@ -1,0 +1,25 @@
+# Detection: just_a_sample_query
+
+**Description:** Sample query that selects all CloudTrail events.
+
+**MITRE Technique:** T0000 – Sample Technique  
+**Severity:** Informational
+
+---
+
+## Summary
+
+| Metric               | Value                     |
+|----------------------|---------------------------|
+| Total events         | **{total_suspicious_requests}** |
+| Distinct event types | **{distinct_external_ips}**     |
+
+---
+
+## Events
+
+{events_table}
+
+---
+
+*Generated on {generated_date}.*
