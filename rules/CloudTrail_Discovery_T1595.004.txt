@@ -1,0 +1,39 @@
+# Detection: T1595.004_CloudTrail
+
+**Description:** Detects CloudTrail data events `ListObjects` or `ListObjectsV2` from IP addresses outside the corporate VPC ranges (172.31.0.0/16, 10.0.0.0/8, 192.168.0.0/16, 127.0.0.0/8).  
+**MITRE Technique:** T1595.004 – Cloud Storage Object Discovery  
+**Severity:** Medium
+
+---
+
+## Summary
+
+| Metric                         | Value                           |
+|--------------------------------|---------------------------------|
+| Distinct external IPs          | **{distinct_external_ips}**     |
+| Total ListObjects events       | **{total_events}**              |
+| Highest-risk operation         | `ListObjects` / `ListObjectsV2` |
+
+---
+
+## Events
+
+{events_table}
+
+---
+
+### Analyst Notes
+
+* ListObjects events reveal potential reconnaissance of object inventory.
+
+---
+
+### Recommended Actions
+
+1. Restrict data-plane ListObjects to sanctioned roles and IPs.  
+2. Monitor CloudTrail Lake for spikes in list operations.  
+3. Validate bucket ACLs and policies for public exposure.
+
+---
+
+*Generated on {generated_date}.*  

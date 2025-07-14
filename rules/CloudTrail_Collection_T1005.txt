@@ -1,0 +1,40 @@
+# Detection: T1005_CloudTrail
+
+**Description:** Detects CloudTrail data events `GetObject` from IP addresses outside the corporate VPC ranges (172.31.0.0/16, 10.0.0.0/8, 192.168.0.0/16, 127.0.0.0/8).  
+**MITRE Technique:** T1005 – Data from Cloud Storage Object  
+**Severity:** High
+
+---
+
+## Summary
+
+| Metric                         | Value                           |
+|--------------------------------|---------------------------------|
+| Distinct external IPs          | **{distinct_external_ips}**     |
+| Total GetObject events         | **{total_events}**              |
+| Highest-risk operation         | `GetObject`                     |
+
+---
+
+## Events
+
+{events_table}
+
+---
+
+### Analyst Notes
+
+* Data-plane downloads in CloudTrail indicate potential exfiltration.
+
+---
+
+### Recommended Actions
+
+1. Review bucket policies to restrict `GetObject`.  
+2. Alert on high-volume `GetObject` calls from unknown IPs.  
+3. Audit and rotate any exposed credentials.  
+4. Enable real-time CloudTrail Lake alerts on data events.
+
+---
+
+*Generated on {generated_date}.*  

@@ -1,0 +1,39 @@
+# Detection: T1595.001_CloudTrail
+
+**Description:** Detects CloudTrail management events `ListBuckets` from IP addresses outside the corporate VPC ranges (172.31.0.0/16, 10.0.0.0/8, 192.168.0.0/16, 127.0.0.0/8).  
+**MITRE Technique:** T1595.001 – Cloud Service Discovery  
+**Severity:** Medium
+
+---
+
+## Summary
+
+| Metric                         | Value                           |
+|--------------------------------|---------------------------------|
+| Distinct external IPs          | **{distinct_external_ips}**     |
+| Total ListBuckets events       | **{total_events}**              |
+| Highest-risk operation         | `ListBuckets`                   |
+
+---
+
+## Events
+
+{events_table}
+
+---
+
+### Analyst Notes
+
+* Unexpected `ListBuckets` calls may signal external reconnaissance of account resources.
+
+---
+
+### Recommended Actions
+
+1. Limit `s3:ListBuckets` to trusted IAM principals.  
+2. Monitor CloudTrail for repeated or anomalous bucket listings.  
+3. Consider alerting on `ListBuckets` outside known IP ranges.
+
+---
+
+*Generated on {generated_date}.*  

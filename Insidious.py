@@ -4,8 +4,9 @@ import pandas as pd
 import boto3
 import argparse
 import re
+import tempfile
+import shlex
 from urllib.parse import unquote_plus
-from pathlib import Path
 from pathlib import Path
 from datetime import datetime
 from pandasql import sqldf
@@ -32,29 +33,48 @@ def loadReportTemplates(sTemplateDir):
     return dTemplates
 
 def parseS3AccessLog(sFilePath):
-    from urllib.parse import unquote_plus
     aOut = []
-    for sLine in Path(sFilePath).read_text(encoding='utf-8').splitlines():
-        aP = sLine.split()
-        if len(aP) < 15:
+    for line in Path(sFilePath).read_text(encoding='utf-8').splitlines():
+        try:
+            parts = shlex.split(line)
+        except ValueError:
             continue
+
+        if len(parts) < 25:
+            continue
+
+        ts = f"{parts[2]} {parts[3]}"
+
         dLog = {
-            'bucket_owner': aP[0],
-            'bucket':       aP[1],
-            'host':         aP[1],
-            'timestamp':    aP[2] + ' ' + aP[3],
-            'remote_ip':    aP[4],
-            'requester':    aP[5],
-            'request_id':   aP[6],
-            'operation':    aP[7],
-            'object_key':   unquote_plus(aP[8]),
-            'request_uri':  aP[11] if len(aP) > 11 else '',
-            'http_status':  aP[12],
-            'error_code':   aP[13],
-            'bytes_sent':   aP[14],
-            'user_agent':   ' '.join(aP[15:-1]) if len(aP) > 16 else ''
+            'bucket_owner':     parts[0],
+            'bucket':           parts[1],
+            'host':             parts[1],
+            'timestamp':        ts,
+            'remote_ip':        parts[4],
+            'requester':        parts[5],
+            'request_id':       parts[6],
+            'operation':        parts[7],
+            'object_key':       unquote_plus(parts[8]),
+            'request_uri':      parts[9],
+            'http_status':      parts[10],
+            'error_code':       parts[11],
+            'bytes_sent':       parts[12],
+            'object_size':      parts[13],
+            'total_time':       parts[14],
+            'turn_around_time': parts[15],
+            'referrer':         parts[16],
+            'user_agent':       parts[17],
+            'version_id':       parts[18],
+            'host_id':          parts[19],
+            'signature_version':parts[20],
+            'cipher_suite':     parts[21],
+            'auth_header':      parts[22],
+            'host_header':      parts[23],
+            'tls_version':      parts[24],
         }
+
         aOut.append(dLog)
+
     return aOut
 
 def parseCloudTrail(sFilePath):
@@ -155,26 +175,38 @@ def loadLogsFromLocal(sLogDir):
     return aAll
 
 def loadLogsFromS3(sS3Path):
-    sBucket,sPrefix = sS3Path.replace('s3://','').split('/',1)
-    s3 = boto3.client('s3')
-    aAll = []
-    for pg in s3.get_paginator('list_objects_v2').paginate(Bucket=sBucket,Prefix=sPrefix):
-        for o in pg.get('Contents',[]):
-            txt = s3.get_object(Bucket=sBucket,Key=o['Key'])['Body'].read().decode('utf-8')
-            if detectLogTypeFromText(txt[:200])=='cloudtrail':
-                jData = json.loads(txt)
-                if isinstance(jData,dict) and 'Records' in jData: aAll.extend(jData['Records'])
-                elif isinstance(jData,list): aAll.extend(jData)
-            else:
-                for ln in txt.splitlines():
-                    aP = ln.split()
-                    if len(aP)<15: continue
-                    sTs = aP[2]+' '+aP[3]
-                    sIp = aP[4]
-                    sOp = aP[7]
-                    sObj = unquote_plus(aP[8])
-                    sUa = ' '.join(aP[15:-1]) if len(aP)>16 else ''
-                    aAll.append({'timestamp':sTs,'remote_ip':sIp,'operation':sOp,'bucket':'','object_key':sObj,'user_agent':sUa})
+    sBucket, sPrefix = sS3Path.replace('s3://', '').split('/', 1)
+    s3         = boto3.client('s3')
+    aAll       = []
+
+    paginator = s3.get_paginator('list_objects_v2')
+    for page in paginator.paginate(Bucket=sBucket, Prefix=sPrefix):
+        for obj in page.get('Contents', []):
+            key = obj['Key']
+
+            if key.endswith('/') or not os.path.basename(key):
+                continue
+
+            resp = s3.get_object(Bucket=sBucket, Key=key)
+            txt  = resp['Body'].read().decode('utf-8')
+
+            with tempfile.NamedTemporaryFile('w+', encoding='utf-8', delete=False) as tf:
+                tf.write(txt)
+                tmp_path = tf.name
+
+            try:
+                if txt.lstrip().startswith('{'):
+                    aAll.extend(parseCloudTrail(tmp_path))
+                else:
+                    aAll.extend(parseS3AccessLog(tmp_path))
+            except Exception as e:
+                print(f"[ERROR] Failed to parse '{key}': {e}")
+            finally:
+                try:
+                    Path(tmp_path).unlink()
+                except Exception as cleanup_err:
+                    print(f"[WARN] Could not delete temp file '{tmp_path}': {cleanup_err}")
+
     return aAll
 
 def applyQueriesWithSQL(dfLogs,aQueries):
@@ -185,63 +217,157 @@ def applyQueriesWithSQL(dfLogs,aQueries):
         aHits.append(dfH)
     return pd.concat(aHits,ignore_index=True) if aHits else pd.DataFrame()
 
-def generateRawReports(dfRes,sOutPref,bCloudSave):
-    sTs = datetime.utcnow().strftime('%Y%m%dT%H%M%SZ')
-    if not bCloudSave: Path(sOutPref).mkdir(parents=True,exist_ok=True)
-    sCsv  = f"{sOutPref}/report_{sTs}.csv"  if not bCloudSave else f"temp_report_{sTs}.csv"
-    sXlsx = f"{sOutPref}/report_{sTs}.xlsx" if not bCloudSave else f"temp_report_{sTs}.xlsx"
-    dfRes.to_csv(sCsv,index=False); dfRes.to_excel(sXlsx,index=False)
-    print(f"CSV saved to: {sCsv}"); print(f"XLSX saved to: {sXlsx}"); print(f"You got {len(dfRes)} hits!")
-    return sCsv,sXlsx
+def uploadToS3(sLocal,sBucket,sKey):
+    s3=boto3.client('s3'); s3.put_object(Bucket=sBucket,Key=sKey); s3.upload_file(sLocal,sBucket,sKey)
+    print(f"Uploaded to s3://{sBucket}/{sKey}")
 
-def renderTemplatedReport(sName,dfHits,sTemplate,sOutPref):
-    sTs = datetime.utcnow().strftime('%Y%m%dT%H%M%SZ')
-    nIps = dfHits['remote_ip'].nunique()
-    sBuc = ', '.join(dfHits['bucket'].unique())
-    nTot = len(dfHits)
-    sOp  = dfHits['operation'].mode().iloc[0] if nTot>0 else ''
-    sEv  = ''
-    for r in dfHits.itertuples():
-        sTime = datetime.strptime(r.timestamp.split()[0],'[%d/%b/%Y:%H:%M:%S').strftime('%d %b %Y %H:%M:%S')
-        sObj  = (r.object_key[:27]+'...') if len(r.object_key)>30 else r.object_key
-        sUa   = (r.user_agent[:37]+'...')  if len(r.user_agent)>40 else r.user_agent
-        sEv  += f"| {sTime} | {r.remote_ip} | {r.operation} | {sObj} | {sUa} |\n"
-    sRpt = sTemplate.format(
-        detection=sName,description='',mitre='',severity='',
-        distinct_external_ips=nIps,buckets_involved=sBuc,
-        total_suspicious_requests=nTot,highest_risk_operation=sOp,
-        events_table=sEv.rstrip(),generated_date=datetime.utcnow().strftime('%d %b %Y')
-    )
-    Path(sOutPref).mkdir(parents=True,exist_ok=True)
-    sMd = f"{sOutPref}/{sName}_{sTs}.md"
-    open(sMd,'w').write(sRpt)
-    print(f"Report saved to: {sMd}")
-    return sMd
+def analyzeLogs(sInputPath, sQueryDir, sTemplateDir, sOutPref,
+                bInputS3, bOutputS3, sS3Out):
+    aQueries   = loadTxtQueries(sQueryDir)
+    dTemplates = loadReportTemplates(sTemplateDir)
+
+    aLogs  = loadLogsFromS3(sInputPath) if bInputS3 else loadLogsFromLocal(sInputPath)
+    dfLogs = pd.DataFrame(aLogs)
+
+    dfHits = applyQueriesWithSQL(dfLogs, aQueries)
+
+    sCsv, sXlsx = generateRawReports(dfHits, sOutPref, bOutputS3)
+
+    templated_md_paths = []
+    aQNames = {d['name'] for d in aQueries}
+    for sName, sTemplate in dTemplates.items():
+        if sName not in aQNames:
+            continue
+
+        dfSub = dfHits[dfHits['__query_name'] == sName]
+        if dfSub.empty:
+            continue
+
+        sMd = renderTemplatedReport(sName, dfSub, sTemplate, sOutPref, bOutputS3)
+        templated_md_paths.append(sMd)
+
+    if bOutputS3:
+        bucket, prefix = sS3Out.replace("s3://", "").split("/", 1)
+        prefix = prefix.rstrip("/")
+        for md_path in templated_md_paths:
+            key = f"{prefix}/{os.path.basename(md_path)}"
+            uploadToS3(md_path, bucket, key)
+            os.remove(md_path)
+        for data_path in (sCsv, sXlsx):
+            key = f"{prefix}/{os.path.basename(data_path)}"
+            uploadToS3(data_path, bucket, key)
+            os.remove(data_path)
 
 def uploadToS3(sLocal,sBucket,sKey):
     s3=boto3.client('s3'); s3.put_object(Bucket=sBucket,Key=sKey); s3.upload_file(sLocal,sBucket,sKey)
     print(f"Uploaded to s3://{sBucket}/{sKey}")
 
-def analyzeLogs(sInputPath,sQueryDir,sTemplateDir,sOutPref,bInputS3,bOutputS3,sS3Out):
+def generateRawReports(dfRes, sOutPref, bCloudSave):
+    sTs = datetime.utcnow().strftime('%Y%m%dT%H%M%SZ')
+    if not bCloudSave:
+        os.makedirs(sOutPref, exist_ok=True)
+        sCsv = os.path.join(sOutPref, f"report_{sTs}.csv")
+        sXlsx = os.path.join(sOutPref, f"report_{sTs}.xlsx")
+    else:
+        tmpdir = tempfile.gettempdir()
+        sCsv = os.path.join(tmpdir, f"report_{sTs}.csv")
+        sXlsx = os.path.join(tmpdir, f"report_{sTs}.xlsx")
+    dfRes.to_csv(sCsv, index=False)
+    dfRes.to_excel(sXlsx, index=False)
+    if not bCloudSave:
+        print(f"CSV saved to:  {sCsv}")
+        print(f"XLSX saved to: {sXlsx}")
+    else:
+        print(f"Temp CSV:  {sCsv}")
+        print(f"Temp XLSX: {sXlsx}")
+    print(f"You got {len(dfRes)} hits!")
+    return sCsv, sXlsx
+
+def renderTemplatedReport(sName, dfHits, sTemplate, sOutPref, bCloudSave):
+    sTs = datetime.utcnow().strftime('%Y%m%dT%H%M%SZ')
+
+    # Core metrics
+    nIps = dfHits['remote_ip'].nunique()
+    buckets = dfHits['bucket'].unique().tolist()
+    nTot = len(dfHits)
+    sOp = dfHits['operation'].mode().iloc[0] if nTot > 0 else ''
+
+    # Objects (for Collection)
+    objs = dfHits.get('object_key', pd.Series(dtype=str)).dropna().unique().tolist()
+    objs_display = ', '.join(objs[:10] + (['…'] if len(objs) > 10 else []))
+
+    # Build events table
+    sEv = ""
+    for r in dfHits.itertuples():
+        raw_time = r.timestamp.split()[0]
+        dt = datetime.strptime(raw_time, "[%d/%b/%Y:%H:%M:%S")
+        sTime = dt.strftime("%d %b %Y %H:%M:%S")
+        sObj = (r.object_key[:27] + "...") if len(r.object_key) > 30 else r.object_key
+        sUa  = (r.user_agent[:37] + "...") if len(r.user_agent) > 40 else r.user_agent
+        sEv += f"| {sTime} | {r.remote_ip} | {r.operation} | {sObj} | {sUa} |\n"
+
+    sRpt = sTemplate.format(
+        detection                 = sName,
+        description               = '',
+        mitre                     = '',
+        severity                  = '',
+        distinct_external_ips     = nIps,
+        buckets_involved          = ', '.join(buckets),
+        buckets_probed            = ', '.join(buckets),
+        objects_downloaded        = objs_display,
+        total_suspicious_requests = nTot,
+        total_head_requests       = nTot,
+        total_list_requests       = nTot,
+        highest_risk_operation    = sOp,
+        events_table              = sEv.rstrip(),
+        generated_date            = datetime.utcnow().strftime("%d %b %Y")
+    )
+
+    target_dir = sOutPref if not bCloudSave else tempfile.gettempdir()
+    os.makedirs(target_dir, exist_ok=True)
+    sMd = os.path.join(target_dir, f"{sName}_{sTs}.md")
+    with open(sMd, "w", encoding="utf-8") as f:
+        f.write(sRpt)
+    print(f"Report saved to: {sMd}")
+    return sMd
+
+    
+def analyzeLogs(sInputPath, sQueryDir, sTemplateDir, sOutPref,
+                bInputS3, bOutputS3, sS3Out):
     aQueries   = loadTxtQueries(sQueryDir)
     dTemplates = loadReportTemplates(sTemplateDir)
-    aLogs      = loadLogsFromS3(sInputPath) if bInputS3 else loadLogsFromLocal(sInputPath)
-    dfLogs     = pd.DataFrame(aLogs)
-    dfHits     = applyQueriesWithSQL(dfLogs,aQueries)
-    sCsv,sXlsx = generateRawReports(dfHits,sOutPref,bOutputS3)
-    aQNames    = {d['name'] for d in aQueries}
-    for sName,sTemplate in dTemplates.items():
-        if sName not in aQNames: continue
-        dfSub = dfHits[dfHits['__query_name']==sName]
-        if dfSub.empty: continue
-        sMd = renderTemplatedReport(sName,dfSub,sTemplate,sOutPref)
-        if bOutputS3:
-            sBucket,sPrefix = sS3Out.replace('s3://','').split('/',1)
-            uploadToS3(sMd,sBucket,f"{sPrefix}/{os.path.basename(sMd)}")
+
+    aLogs  = loadLogsFromS3(sInputPath) if bInputS3 else loadLogsFromLocal(sInputPath)
+    dfLogs = pd.DataFrame(aLogs)
+
+    dfHits = applyQueriesWithSQL(dfLogs, aQueries)
+
+    sCsv, sXlsx = generateRawReports(dfHits, sOutPref, bOutputS3)
+
+    templated_md_paths = []
+    aQNames = {d['name'] for d in aQueries}
+    for sName, sTemplate in dTemplates.items():
+        if sName not in aQNames:
+            continue
+
+        dfSub = dfHits[dfHits['__query_name'] == sName]
+        if dfSub.empty:
+            continue
+
+        sMd = renderTemplatedReport(sName, dfSub, sTemplate, sOutPref, bOutputS3)
+        templated_md_paths.append(sMd)
+
     if bOutputS3:
-        sBucket,sPrefix = sS3Out.replace('s3://','').split('/',1)
-        uploadToS3(sCsv,sBucket,f"{sPrefix}/{os.path.basename(sCsv)}")
-        uploadToS3(sXlsx,sBucket,f"{sPrefix}/{os.path.basename(sXlsx)}")
+        bucket, prefix = sS3Out.replace("s3://", "").split("/", 1)
+        prefix = prefix.rstrip("/")
+        for md_path in templated_md_paths:
+            key = f"{prefix}/{os.path.basename(md_path)}"
+            uploadToS3(md_path, bucket, key)
+            os.remove(md_path)
+        for data_path in (sCsv, sXlsx):
+            key = f"{prefix}/{os.path.basename(data_path)}"
+            uploadToS3(data_path, bucket, key)
+            os.remove(data_path)
 
 if __name__=='__main__':
     p=argparse.ArgumentParser()

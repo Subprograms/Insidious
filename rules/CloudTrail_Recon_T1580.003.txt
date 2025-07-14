@@ -1,0 +1,39 @@
+# Detection: T1580.003_CloudTrail
+
+**Description:** Detects CloudTrail management events `HeadBucket` from IP addresses outside the corporate VPC ranges (172.31.0.0/16, 10.0.0.0/8, 192.168.0.0/16, 127.0.0.0/8).  
+**MITRE Technique:** T1580.003 – Obtain Cloud Instance Metadata  
+**Severity:** Low
+
+---
+
+## Summary
+
+| Metric                         | Value                      |
+|--------------------------------|----------------------------|
+| Distinct external IPs          | **{distinct_external_ips}**|
+| Total HeadBucket events        | **{total_events}**         |
+| Highest-risk operation         | `HeadBucket`               |
+
+---
+
+## Events
+
+{events_table}
+
+---
+
+### Analyst Notes
+
+* HeadBucket events indicate probing for bucket existence or permissions.
+
+---
+
+### Recommended Actions
+
+1. Limit `s3:HeadBucket` usage to authorized principals.  
+2. Enable real-time alerts on anomalous `HeadBucket` calls.  
+3. Review bucket policies for unnecessary public exposure.
+
+---
+
+*Generated on {generated_date}.*  

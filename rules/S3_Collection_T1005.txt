@@ -1,0 +1,41 @@
+# Detection: T1005_S3
+
+**Description:** Detects S3 object-download (`REST.GET.OBJECT`) calls from IP addresses outside the corporate VPC ranges (172.31.0.0/16, 10.0.0.0/8, 192.168.0.0/16, 127.0.0.0/8).  
+**MITRE Technique:** T1005 – Data from Cloud Storage Object  
+**Severity:** High
+
+---
+
+## Summary
+
+| Metric                         | Value                           |
+|--------------------------------|---------------------------------|
+| Distinct external IPs          | **{distinct_external_ips}**     |
+| Object(s) downloaded           | **{objects_downloaded}**        |
+| Total download requests        | **{total_suspicious_requests}** |
+| Highest-risk operation         | `GET.OBJECT`                    |
+
+---
+
+## Events
+
+{events_table}
+
+---
+
+### Analyst Notes
+
+* External downloads often indicate data exfiltration.
+
+---
+
+### Recommended Actions
+
+1. Audit downloaded objects for sensitive content.  
+2. Deny `s3:GetObject` from non-whitelisted CIDRs.  
+3. Rotate exposed credentials and review IAM roles.  
+4. Enable GuardDuty S3 protection and real-time data-plane alerts.
+
+---
+
+*Generated on {generated_date}.*  
