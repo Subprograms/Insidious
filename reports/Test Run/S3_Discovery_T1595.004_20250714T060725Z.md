@@ -10,16 +10,16 @@
 
 | Metric                         | Value                           |
 |--------------------------------|---------------------------------|
-| Distinct external IPs          | **1**     |
-| Bucket(s) involved             | **burgerqueen-dev-secrets**          |
-| Total list requests            | **2**       |
+| Distinct external IPs          | **1**                           |
+| Bucket(s) involved             | **burgerqueen-dev-secrets**     |
+| Total list requests            | **2**                           |
 | Highest-risk operation         | `GET.BUCKET?list-type=`         |
 
 ---
 
 ## Events
 
-| 07 Jul 2025 02:55:48 | 158.62.32.52 | REST.GET.BUCKET | - | Mozilla/5.0 (Windows NT 10.0; Win64; ... |
+| 08 Jul 2025 02:55:48 | 158.62.32.52 | REST.GET.BUCKET | - | Mozilla/5.0 (Windows NT 10.0; Win64; ... |
 | 08 Jul 2025 02:55:52 | 158.62.32.52 | REST.GET.BUCKET | - | python-requests/2.28.1 |
 
 ---

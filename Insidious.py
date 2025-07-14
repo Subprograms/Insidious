@@ -285,53 +285,53 @@ def generateRawReports(dfRes, sOutPref, bCloudSave):
 
 def renderTemplatedReport(sName, dfHits, sTemplate, sOutPref, bCloudSave):
     sTs = datetime.utcnow().strftime('%Y%m%dT%H%M%SZ')
-
-    # Core metrics
     nIps = dfHits['remote_ip'].nunique()
-    buckets = dfHits['bucket'].unique().tolist()
     nTot = len(dfHits)
     sOp = dfHits['operation'].mode().iloc[0] if nTot > 0 else ''
-
-    # Objects (for Collection)
+    buckets = dfHits['bucket'].unique().tolist()
     objs = dfHits.get('object_key', pd.Series(dtype=str)).dropna().unique().tolist()
     objs_display = ', '.join(objs[:10] + (['…'] if len(objs) > 10 else []))
 
-    # Build events table
     sEv = ""
     for r in dfHits.itertuples():
         raw_time = r.timestamp.split()[0]
         dt = datetime.strptime(raw_time, "[%d/%b/%Y:%H:%M:%S")
         sTime = dt.strftime("%d %b %Y %H:%M:%S")
-        sObj = (r.object_key[:27] + "...") if len(r.object_key) > 30 else r.object_key
-        sUa  = (r.user_agent[:37] + "...") if len(r.user_agent) > 40 else r.user_agent
+        sObj = (r.object_key[:27] + "...") if getattr(r, 'object_key', None) and len(r.object_key) > 30 else getattr(r, 'object_key', '')
+        sUa  = (r.user_agent[:37] + "...") if getattr(r, 'user_agent', None) and len(r.user_agent) > 40 else getattr(r, 'user_agent', '')
         sEv += f"| {sTime} | {r.remote_ip} | {r.operation} | {sObj} | {sUa} |\n"
 
     sRpt = sTemplate.format(
-        detection                 = sName,
-        description               = '',
-        mitre                     = '',
-        severity                  = '',
-        distinct_external_ips     = nIps,
-        buckets_involved          = ', '.join(buckets),
-        buckets_probed            = ', '.join(buckets),
-        objects_downloaded        = objs_display,
-        total_suspicious_requests = nTot,
-        total_head_requests       = nTot,
-        total_list_requests       = nTot,
-        highest_risk_operation    = sOp,
-        events_table              = sEv.rstrip(),
-        generated_date            = datetime.utcnow().strftime("%d %b %Y")
+        detection                   = sName,
+        description                 = '',
+        mitre                       = '',
+        severity                    = '',
+        distinct_external_ips       = nIps,
+        buckets_involved            = ', '.join(buckets),
+        buckets_probed              = ', '.join(buckets),
+        objects_downloaded          = objs_display,
+        total_suspicious_requests   = nTot,
+        total_events                = nTot,
+        total_head_requests         = nTot,
+        total_list_requests         = nTot,
+        highest_risk_operation      = sOp,
+        events_table                = sEv.rstrip(),
+        generated_date              = datetime.utcnow().strftime("%d %b %Y")
     )
 
-    target_dir = sOutPref if not bCloudSave else tempfile.gettempdir()
-    os.makedirs(target_dir, exist_ok=True)
-    sMd = os.path.join(target_dir, f"{sName}_{sTs}.md")
+    if not bCloudSave:
+        os.makedirs(sOutPref, exist_ok=True)
+        sMd = os.path.join(sOutPref, f"{sName}_{sTs}.md")
+    else:
+        tmpdir = tempfile.gettempdir()
+        sMd = os.path.join(tmpdir, f"{sName}_{sTs}.md")
+        
     with open(sMd, "w", encoding="utf-8") as f:
         f.write(sRpt)
+
     print(f"Report saved to: {sMd}")
     return sMd
 
-    
 def analyzeLogs(sInputPath, sQueryDir, sTemplateDir, sOutPref,
                 bInputS3, bOutputS3, sS3Out):
     aQueries   = loadTxtQueries(sQueryDir)

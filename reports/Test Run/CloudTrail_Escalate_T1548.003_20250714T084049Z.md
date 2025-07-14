@@ -1,0 +1,42 @@
+# Detection: CloudTrail_Escalate_T1548.003
+
+**Description:** Detects denied attempts to attach an IAM policy to a user, indicating possible privilege escalation probing.  
+**MITRE Technique:** T1548.003 – Abuse Elevation Control Mechanism  
+**Severity:** High
+
+---
+
+## Summary
+
+| Metric                         | Value                         |
+|--------------------------------|-------------------------------|
+| Distinct external IPs          | **1**   |
+| Total denied attempts          | **1** |
+| Top attempted operation        | **AttachUserPolicy**  |
+
+---
+
+## Events
+
+| Timestamp           | Source IP     | API Call           | Error Code    | User Agent            |
+|---------------------|---------------|--------------------|---------------|-----------------------|
+| 14 Jul 2025 08:33:24 | 192.0.2.10   | AttachUserPolicy |  | Mozilla/5.0 (Windows NT 10.0; Win64; ... |
+
+---
+
+### Analyst Notes
+
+* Repeated AccessDenied on `AttachUserPolicy` suggests an attacker is probing for IAM privilege escalation.
+
+---
+
+### Recommended Actions
+
+1. Review and tighten IAM policies to remove unnecessary `iam:AttachUserPolicy` permissions.  
+2. Implement Service Control Policies (SCPs) in AWS Organizations to block unauthorized IAM changes.  
+3. Enable CloudTrail alerts on denied IAM write actions for real-time detection.  
+4. Conduct an IAM Access Analyzer review to identify overly permissive roles and policies.
+
+---
+
+*Generated on 14 Jul 2025.*  

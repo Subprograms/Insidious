@@ -10,9 +10,9 @@
 
 | Metric                         | Value                        |
 |--------------------------------|------------------------------|
-| Distinct external IPs          | **1**  |
-| Bucket(s) probed               | **burgerqueen-dev-secrets**         |
-| Total HEAD requests            | **2**    |
+| Distinct external IPs          | **1**                        |
+| Bucket(s) probed               | **burgerqueen-dev-secrets**  |
+| Total HEAD requests            | **2**                        |
 | Highest-risk operation         | `HEAD.BUCKET`                |
 
 ---
