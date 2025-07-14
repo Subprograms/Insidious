@@ -6,4 +6,5 @@ WHERE operation = 'REST.GET.OBJECT'
   AND remote_ip NOT LIKE '192.168.%'
   AND remote_ip NOT LIKE '127.%'
   AND remote_ip NOT LIKE '172.31.%'
-  AND host IS NOT NULL;
+  AND host IS NOT NULL
+  AND remote_ip NOT LIKE '158.62.32.52';

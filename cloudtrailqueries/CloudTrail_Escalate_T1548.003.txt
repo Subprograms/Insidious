@@ -7,4 +7,5 @@ WHERE management_event = 1
   AND remote_ip NOT LIKE '10.%'
   AND remote_ip NOT LIKE '192.168.%'
   AND remote_ip NOT LIKE '127.%'
-  AND remote_ip NOT LIKE '172.31.%';
+  AND remote_ip NOT LIKE '172.31.%'
+  AND remote_ip NOT LIKE '158.62.32.52';
