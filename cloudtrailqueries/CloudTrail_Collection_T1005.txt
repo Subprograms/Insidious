@@ -1,9 +1,12 @@
 SELECT *
 FROM logs
-WHERE event_source = 's3.amazonaws.com'
-  AND operation    = 'GetObject'
-  AND remote_ip NOT LIKE '10.%'
-  AND remote_ip NOT LIKE '192.168.%'
-  AND remote_ip NOT LIKE '127.%'
-  AND remote_ip NOT LIKE '172.31.%'
-  AND remote_ip NOT LIKE '158.62.32.52';
+WHERE event_source    = 's3.amazonaws.com'
+  AND event_name      = 'GetObject'
+  AND sourceIPAddress NOT LIKE '10.%'
+  AND sourceIPAddress NOT LIKE '192.168.%'
+  AND sourceIPAddress NOT LIKE '127.%'
+  AND sourceIPAddress NOT LIKE '172.31.%'
+  AND sourceIPAddress NOT LIKE '158.62.32.52'
+  AND requestParameters.bucketName IS NOT NULL
+  AND requestParameters.key        IS NOT NULL
+  AND requestParameters.key NOT LIKE '%favicon.ico';
