@@ -3,7 +3,6 @@ FROM logs
 WHERE management_event = 1
   AND event_source = 'iam.amazonaws.com'
   AND operation    = 'AttachUserPolicy'
-  AND error_code   = 'AccessDenied'
   AND remote_ip NOT LIKE '10.%'
   AND remote_ip NOT LIKE '192.168.%'
   AND remote_ip NOT LIKE '127.%'
